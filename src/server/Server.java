@@ -278,22 +278,48 @@ public class Server {
                                 int y = Integer.parseInt(words[2]);
 
                                 ShotResult res = null;
+                                Boat destroyedBoat = null;
 
                                 if (from.equals(this.playerOne)) {
                                     res = t2.shot(x, y);
+                                    if (res == ShotResult.Destroyed || res == ShotResult.GameOver) {
+                                        destroyedBoat = t2.lastDestroyedBoat;
+                                    }
                                     turn = 2;
                                     System.out.println("T2 =");
                                     t2.print();
 
                                 } else if (from.equals(this.playerTwo)) {
                                     res = t1.shot(x, y);
+                                    if (res == ShotResult.Destroyed || res == ShotResult.GameOver) {
+                                        destroyedBoat = t1.lastDestroyedBoat;
+                                    }
                                     turn = 1;
                                     System.out.println("T1 =");
                                     t1.print();
                                 }
 
-                                from.send(res.toString());
+                                String resStr = res.toString();
+                                if ((res == ShotResult.Destroyed || res == ShotResult.GameOver) && destroyedBoat != null) {
+                                    StringBuilder sb = new StringBuilder();
+                                    for (int i = 0; i < destroyedBoat.pos.length; i++) {
+                                        sb.append(destroyedBoat.pos[i]);
+                                        if (i < destroyedBoat.pos.length - 1) sb.append(",");
+                                    }
+                                    resStr += " " + sb.toString();
+                                }
+
+                                from.send(resStr);
                                 to.send("You got attacked on: " + x + " " + y);
+                                
+                                if (res == ShotResult.GameOver) {
+                                    to.send("GameOver_Loss");
+                                    t1.reset();
+                                    t2.reset();
+                                    turn = 1;
+                                    from.send("MATCH_RESET");
+                                    to.send("MATCH_RESET");
+                                }
 
                             } catch (Exception e) {
                                 from.send("Invalid attack command");

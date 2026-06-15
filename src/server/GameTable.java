@@ -64,14 +64,20 @@ public class GameTable {
     private int boat_count;
     private int[] boat_sizes = {2, 3, 4};
     private List<Boat> boats;
+    public Boat lastDestroyedBoat = null;
 
 
     GameTable() {
+        this.reset();
+    }
+
+    public void reset() {
         this.size = 100;
-        this.table =  new Boolean[size];
-        this.side = 10; // (int)((double)this.size/10.0);
+        this.table = new Boolean[size];
+        this.side = 10;
         this.boat_count = boat_sizes.length * 2;
         this.boats = new ArrayList<>(boat_count);
+        this.lastDestroyedBoat = null;
         this.generate();
     }
 
@@ -225,12 +231,7 @@ public class GameTable {
 
         if (c != 18) {  // Generation fail safe
             System.out.println("Bomba atomica paia foda");
-            this.size = 100;
-            this.table =  new Boolean[size];
-            this.side = 10; // (int)((double)this.size/10.0);
-            this.boat_count = boat_sizes.length * 2;
-            this.boats = new ArrayList<>(boat_count);
-            this.generate();
+            this.reset();
         }
     }
 
@@ -280,6 +281,7 @@ public class GameTable {
                         res = ShotResult.Hit;
                     } else {
                         res = ShotResult.Destroyed;
+                        this.lastDestroyedBoat = b;
                         this.boat_count--;
                         if (boat_count == 0) {
                             res = ShotResult.GameOver;

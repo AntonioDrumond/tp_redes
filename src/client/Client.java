@@ -30,17 +30,29 @@ public class Client extends JFrame {
     private final JTextArea logArea = new JTextArea();
     private final JTextField messageField = new JTextField();
     private final JButton sendButton = new JButton("Send");
+    
+    private final JToggleButton[][] tiles = new JToggleButton[10][10];
+    private final ButtonGroup tileGroup = new ButtonGroup();
+    private final JLabel turnLabel = new JLabel("Turn: Not started");
+    private final JButton attackButton = new JButton("Attack");
+    private final JPanel gamePanel = new JPanel(new BorderLayout());
 
     private Socket socket;
     private BufferedReader input;
     private PrintWriter output;
     private Thread receiverThread;
+    
+    private boolean myTurn = false;
+    private int myId = -1;
+    private int opponentId = -1;
+    private int lastAttackX = -1;
+    private int lastAttackY = -1;
 
     public Client() {
         super("Naval Battle Client");
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-        setMinimumSize(new Dimension(720, 460));
-        setSize(720, 460);
+        setMinimumSize(new Dimension(720, 600));
+        setSize(720, 600);
         setLocationByPlatform(true);
 
         buildInterface();
@@ -77,18 +89,53 @@ public class Client extends JFrame {
         constraints.weightx = 1;
         connectionPanel.add(Box.createHorizontalGlue(), constraints);
 
+        // Game Panel
+        JPanel matrixPanel = new JPanel(new GridLayout(10, 10, 2, 2));
+        for (int i = 0; i < 10; i++) {
+            for (int j = 0; j < 10; j++) {
+                tiles[i][j] = new JToggleButton();
+                tiles[i][j].setPreferredSize(new Dimension(30, 30));
+                tiles[i][j].setEnabled(false);
+                tileGroup.add(tiles[i][j]);
+                matrixPanel.add(tiles[i][j]);
+            }
+        }
+        
+        JPanel gameInfoPanel = new JPanel(new BorderLayout());
+        JPanel turnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        turnLabel.setFont(turnLabel.getFont().deriveFont(Font.BOLD, 14f));
+        turnPanel.add(turnLabel);
+        
+        JPanel attackPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        attackButton.setEnabled(false);
+        attackPanel.add(attackButton);
+        
+        gameInfoPanel.add(turnPanel, BorderLayout.NORTH);
+        gameInfoPanel.add(attackPanel, BorderLayout.SOUTH);
+        
+        gamePanel.add(matrixPanel, BorderLayout.CENTER);
+        gamePanel.add(gameInfoPanel, BorderLayout.EAST);
+
         logArea.setEditable(false);
         logArea.setLineWrap(true);
         logArea.setWrapStyleWord(true);
         JScrollPane scrollPane = new JScrollPane(logArea);
+        scrollPane.setPreferredSize(new Dimension(720, 150));
 
         JPanel messagePanel = new JPanel(new BorderLayout(8, 0));
         messagePanel.add(messageField, BorderLayout.CENTER);
         messagePanel.add(sendButton, BorderLayout.EAST);
+        
+        JPanel chatPanel = new JPanel(new BorderLayout(0, 8));
+        chatPanel.setBorder(BorderFactory.createTitledBorder("Chat"));
+        chatPanel.add(scrollPane, BorderLayout.CENTER);
+        chatPanel.add(messagePanel, BorderLayout.SOUTH);
+
+        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, gamePanel, chatPanel);
+        splitPane.setResizeWeight(0.6);
 
         content.add(connectionPanel, BorderLayout.NORTH);
-        content.add(scrollPane, BorderLayout.CENTER);
-        content.add(messagePanel, BorderLayout.SOUTH);
+        content.add(splitPane, BorderLayout.CENTER);
     }
 
     private void addLabeledField(JPanel panel, GridBagConstraints constraints, String label, JComponent field) {
@@ -102,6 +149,7 @@ public class Client extends JFrame {
         statusButton.addActionListener(event -> requestUdpStatus());
         sendButton.addActionListener(event -> sendMessage());
         messageField.addActionListener(event -> sendMessage());
+        attackButton.addActionListener(event -> performAttack());
 
         addWindowListener(new WindowAdapter() {
             @Override
@@ -155,7 +203,10 @@ public class Client extends JFrame {
                 String line;
                 while ((line = input.readLine()) != null) {
                     String receivedLine = line;
-                    SwingUtilities.invokeLater(() -> appendLog("< " + receivedLine));
+                    SwingUtilities.invokeLater(() -> {
+                        appendLog("< " + receivedLine);
+                        handleServerMessage(receivedLine);
+                    });
                 }
                 SwingUtilities.invokeLater(() -> appendLog("Server closed the connection."));
             } catch (IOException exception) {
@@ -169,6 +220,119 @@ public class Client extends JFrame {
         }, "client-receiver");
 
         receiverThread.start();
+    }
+
+    private void handleServerMessage(String msg) {
+        if (msg.startsWith("MATCH_START")) {
+            try {
+                String[] parts = msg.split(" ");
+                for (int i = 0; i < parts.length; i++) {
+                    if (parts[i].equals("you=")) {
+                        myId = Integer.parseInt(parts[i+1]);
+                    } else if (parts[i].startsWith("opponent=")) {
+                        opponentId = Integer.parseInt(parts[i].substring(9));
+                    }
+                }
+                myTurn = (myId < opponentId);
+                updateTurnDisplay();
+                enableTiles(true);
+            } catch (Exception e) {}
+        } else if (msg.equals("GameOver_Loss")) {
+            JOptionPane.showMessageDialog(this, "Game Over! You lost!");
+        } else if (msg.equals("MATCH_RESET")) {
+            enableTiles(true);
+            myTurn = (myId < opponentId);
+            updateTurnDisplay();
+        } else if (msg.startsWith("Hit") || msg.startsWith("Miss") || msg.startsWith("Destroyed") || msg.startsWith("GameOver ")) {
+            if (lastAttackX != -1 && lastAttackY != -1) {
+                if (msg.startsWith("Hit") || msg.startsWith("Destroyed") || msg.startsWith("GameOver")) {
+                    tiles[lastAttackX][lastAttackY].setBackground(Color.RED);
+                    tiles[lastAttackX][lastAttackY].setText("X");
+                } else if (msg.startsWith("Miss")) {
+                    tiles[lastAttackX][lastAttackY].setBackground(Color.GRAY);
+                    tiles[lastAttackX][lastAttackY].setText("O");
+                }
+                tiles[lastAttackX][lastAttackY].setEnabled(false);
+                tileGroup.clearSelection();
+                lastAttackX = -1;
+                lastAttackY = -1;
+            }
+            
+            if (msg.startsWith("Destroyed") || msg.startsWith("GameOver")) {
+                String[] parts = msg.split(" ");
+                if (parts.length > 1) {
+                    String[] posStrs = parts[1].split(",");
+                    for (String posStr : posStrs) {
+                        try {
+                            int p = Integer.parseInt(posStr);
+                            int bx = p / 10;
+                            int by = p % 10;
+                            tiles[bx][by].setBackground(Color.BLUE);
+                            tiles[bx][by].setText("X");
+                            tiles[bx][by].setEnabled(false);
+                        } catch (NumberFormatException e) {}
+                    }
+                }
+            }
+            
+            myTurn = false;
+            updateTurnDisplay();
+            
+            if (msg.startsWith("GameOver")) {
+                JOptionPane.showMessageDialog(this, "Game Over! You won!");
+                turnLabel.setText("Turn: GAME OVER");
+            }
+        } else if (msg.startsWith("You got attacked on:")) {
+            myTurn = true;
+            updateTurnDisplay();
+        } else if (msg.equals("OPPONENT_LEFT")) {
+            myTurn = false;
+            updateTurnDisplay();
+            JOptionPane.showMessageDialog(this, "Opponent left the game.");
+        }
+    }
+
+    private void updateTurnDisplay() {
+        if (myTurn) {
+            turnLabel.setText("Turn: YOUR TURN");
+            turnLabel.setForeground(Color.GREEN.darker());
+        } else {
+            turnLabel.setText("Turn: OPPONENT");
+            turnLabel.setForeground(Color.RED);
+        }
+        attackButton.setEnabled(myTurn);
+    }
+
+    private void enableTiles(boolean enable) {
+        tileGroup.clearSelection();
+        for (int i = 0; i < 10; i++) {
+            for (int j = 0; j < 10; j++) {
+                tiles[i][j].setEnabled(enable);
+                tiles[i][j].setBackground(null);
+                tiles[i][j].setText("");
+            }
+        }
+    }
+
+    private void performAttack() {
+        if (!isConnected() || !myTurn) return;
+        
+        int selX = -1, selY = -1;
+        for (int i = 0; i < 10; i++) {
+            for (int j = 0; j < 10; j++) {
+                if (tiles[i][j].isSelected()) {
+                    selX = i;
+                    selY = j;
+                    break;
+                }
+            }
+        }
+        if (selX != -1 && selY != -1) {
+            output.println("ATTACK " + selX + " " + selY);
+            appendLog("> ATTACK " + selX + " " + selY);
+            lastAttackX = selX;
+            lastAttackY = selY;
+        }
     }
 
     private void sendMessage() {
@@ -273,6 +437,12 @@ public class Client extends JFrame {
             socket = null;
             input = null;
             output = null;
+            SwingUtilities.invokeLater(() -> {
+                turnLabel.setText("Turn: Not started");
+                turnLabel.setForeground(Color.BLACK);
+                enableTiles(false);
+                attackButton.setEnabled(false);
+            });
         }
     }
 
