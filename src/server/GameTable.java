@@ -116,6 +116,7 @@ public class GameTable {
                     res |= 0b1000;
                 }
             }
+            i = 0;
             if ( (col - boat_size) >= 0) { // Left
                 while (i < boat_size && table[pos - i] == null) {
                     i++;
@@ -124,6 +125,7 @@ public class GameTable {
                     res |= 0b0100;
                 }
             }
+            i = 0;
             if ( (row + boat_size) < 10) { // Up
                 while (i < boat_size && table[(i*side) + pos] == null) {
                     i++;
@@ -132,6 +134,7 @@ public class GameTable {
                     res |= 0b0010;
                 }
             }
+            i = 0;
             if ( (row - boat_size) >= 0) { // Down
                 while (i < boat_size && table[pos - (i*side)] == null) {
                     i++;
@@ -219,7 +222,7 @@ public class GameTable {
             }
         }
 
-        if (c != 18) {
+        if (c != 18) {  // Generation fail safe
             System.out.println("Bomba atomica paia foda");
             this.size = 100;
             this.table =  new Boolean[size];
