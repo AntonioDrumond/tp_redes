@@ -72,9 +72,10 @@ public class GameTable {
         this.side = 10; // (int)((double)this.size/10.0);
         this.boat_count = boat_sizes.length * 2;
         this.boats = new ArrayList<>(boat_count);
+        this.generate();
     }
 
-    private void print() {
+    public void print() {
 
         if (table[0] == null) {
             System.out.print("[ ] ");
@@ -246,6 +247,11 @@ public class GameTable {
             res = true;
         }
         return res;
+    }
+
+    public ShotResult shot(int x, int y) {
+        int pos = (10*x) + y;
+        return shot(pos);
     }
 
     public ShotResult shot(int pos) {

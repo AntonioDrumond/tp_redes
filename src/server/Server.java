@@ -188,6 +188,9 @@ public class Server {
         private final PlayerConnection playerTwo;
         private final AtomicInteger activeMatches;
         private final AtomicBoolean closed = new AtomicBoolean(false);
+        private final GameTable t1;
+        private final GameTable t2;
+        private int turn;
 
         private MatchSession(
                 int id,
@@ -199,6 +202,9 @@ public class Server {
             this.playerOne = playerOne;
             this.playerTwo = playerTwo;
             this.activeMatches = activeMatches;
+            this.t1 = new GameTable();
+            this.t2 = new GameTable();
+            this.turn = 1;
         }
 
         @Override
@@ -208,6 +214,11 @@ public class Server {
 
             playerOne.send("MATCH_START id=" + id + " you=1 opponent=" + playerTwo.id);
             playerTwo.send("MATCH_START id=" + id + " you=2 opponent=" + playerOne.id);
+
+            System.out.println("T1 =");
+            t1.print();
+            System.out.println("T2 =");
+            t2.print();
 
             Thread playerOneRelay = new Thread(() -> relay(playerOne, playerTwo), "match-" + id + "-p1");
             Thread playerTwoRelay = new Thread(() -> relay(playerTwo, playerOne), "match-" + id + "-p2");
@@ -232,9 +243,43 @@ public class Server {
                     if (line.equalsIgnoreCase("QUIT")) {
                         to.send("OPPONENT_LEFT");
                         break;
+                    } else {
+                        String[] words = line.split(" ");
+                        boolean validTurn = false;
+
+                        if (from.equals(playerOne) && this.turn==1) {
+                            validTurn = true;
+                        } else if (from.equals(playerTwo) && this.turn==2) {
+                            validTurn = true;
+                        }
+
+                        if (words[0].equalsIgnoreCase("ATTACK") && validTurn) {
+                            try {
+                                int x = Integer.parseInt(words[1]);
+                                int y = Integer.parseInt(words[2]);
+                                ShotResult res = null;
+                                if (from.equals(this.playerOne)) {
+                                    res = t2.shot(x, y);
+                                    turn = 2;
+                                    System.out.println("T2 =");
+                                    t2.print();
+
+                                } else if (from.equals(this.playerTwo)) {
+                                    res = t1.shot(x, y);
+                                    turn = 1;
+                                    System.out.println("T1 =");
+                                    t1.print();
+                                }
+                                from.send(res.toString());
+                                to.send("You got attacked on: " + x + " " + y);
+                            } catch (Exception e) {
+                                from.send("Seu ataque string invalida");
+                            }
+                        } else {
+                            to.send("OPPONENT " + line);
+                        }
                     }
 
-                    to.send("OPPONENT " + line);
                 }
             } catch (IOException exception) {
                 to.send("OPPONENT_LEFT");
