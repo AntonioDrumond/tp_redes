@@ -1,13 +1,7 @@
 # Batalha Naval — Trabalho Prático de Redes
 
-# O [vídeo](https://www.youtube.com/watch?v=DSWZ7g1n4kE) está disponível como .mp4 no repo ou no YouTube no link:
-
-https://www.youtube.com/watch?v=DSWZ7g1n4kE
-
-O vídeo teve que ser comprimido devido ao limite máximo de tamanho de arquivo do GitHub.
-
-**Disciplina:** Redes de Computadores I
-**Professor:** Max do Val Machado
+- **Disciplina:** Redes de Computadores I
+- **Professor:** Max do Val Machado
 
 **Alunos:**
 - Antônio Drumond
@@ -15,6 +9,12 @@ O vídeo teve que ser comprimido devido ao limite máximo de tamanho de arquivo 
 - Gabriel Valedo
 - Mateus Diniz
 - Raquel Motta
+
+### O [vídeo](https://www.youtube.com/watch?v=DSWZ7g1n4kE) está disponível como .mp4 no repo ou no YouTube no link:
+
+https://www.youtube.com/watch?v=DSWZ7g1n4kE
+
+O vídeo teve que ser comprimido devido ao limite máximo de tamanho de arquivo do GitHub.
 
 ## Sobre o projeto
 
